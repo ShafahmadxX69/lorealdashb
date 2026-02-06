@@ -50,7 +50,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
       invoices.push({
         brand: rows[0][col] || '',
         exportDate: rows[1][col] || '',
-        totalQty: parseInt(rows[2][col]) || 0,
+        totalQty: parseInt(rows[2][col].replace(/,/g, '')) || 0,
         containerInfo: rows[3][col] || '',
         invoiceTitle: rows[4][col] || '',
       });
@@ -59,14 +59,45 @@ export async function fetchDashboardData(): Promise<DashboardData> {
 
   // Parse Line Items (Row 6 onwards, index 5)
   const items: ProductionLineItem[] = [];
+  
+  // Explicitly initialize summary counters to ensure they only total until LIMIT
+  let totalPoQty = 0;
+  let totalStockIn = 0;
+  let totalRemaining = 0;
+  let totalRework = 0;
+  let totalInventory = 0;
+
   for (let i = 5; i < rows.length; i++) {
     const r = rows[i];
-    if (!r || !r[0]) continue; // Skip empty rows
+    if (!r) continue;
+
+    // Check for "LIMIT" sentinel in ANY cell of the row (case insensitive)
+    if (r.some(cell => cell && typeof cell === 'string' && cell.trim().toUpperCase() === 'LIMIT')) {
+      break;
+    }
+
+    // Skip truly empty rows that aren't the LIMIT row
+    if (!r[0] && !r[1] && !r[2] && !r[8]) continue;
 
     const invoiceQtys: number[] = [];
     for (let col = 16; col < r.length; col++) {
-      invoiceQtys.push(parseInt(r[col]) || 0);
+      invoiceQtys.push(parseInt(r[col]?.replace(/,/g, '')) || 0);
     }
+
+    // Mapping columns for calculation:
+    // I (8): poQty, J (9): stockIn, K (10): remaining, N (13): rework, O (14): inventory
+    const poQtyVal = parseInt(r[8]?.replace(/,/g, '')) || 0;
+    const stockInVal = parseInt(r[9]?.replace(/,/g, '')) || 0;
+    const remainingVal = parseInt(r[10]?.replace(/,/g, '')) || 0;
+    const reworkVal = parseInt(r[13]?.replace(/,/g, '')) || 0;
+    const inventoryVal = parseInt(r[14]?.replace(/,/g, '')) || 0;
+
+    // Accumulate summary totals strictly for the rows before LIMIT
+    totalPoQty += poQtyVal;
+    totalStockIn += stockInVal;
+    totalRemaining += remainingVal;
+    totalRework += reworkVal;
+    totalInventory += inventoryVal;
 
     items.push({
       poNo: r[0] || '',
@@ -75,29 +106,25 @@ export async function fetchDashboardData(): Promise<DashboardData> {
       customer: r[3] || '',
       itemType: r[4] || '',
       size: r[5] || '',
-      color: r[7] || '', // Column H is index 7
-      poQty: parseInt(r[8]) || 0, // I
-      stockIn: parseInt(r[9]) || 0, // J
-      remaining: parseInt(r[10]) || 0, // K
-      usedForShipment: parseInt(r[11]) || 0, // L
-      readyForShipment: parseInt(r[12]) || 0, // M
-      reworkQty: parseInt(r[13]) || 0, // N
-      finishedGoodsInventory: parseInt(r[14]) || 0, // O
+      color: r[7] || '', 
+      poQty: poQtyVal,
+      stockIn: stockInVal,
+      remaining: remainingVal,
+      usedForShipment: parseInt(r[11]?.replace(/,/g, '')) || 0,
+      readyForShipment: parseInt(r[12]?.replace(/,/g, '')) || 0,
+      reworkQty: reworkVal,
+      finishedGoodsInventory: inventoryVal,
       invoiceQtys,
     });
   }
 
-  // Calculate Summary
-  const summary = items.reduce(
-    (acc, item) => ({
-      totalPoQty: acc.totalPoQty + item.poQty,
-      totalStockIn: acc.totalStockIn + item.stockIn,
-      totalRemaining: acc.totalRemaining + item.remaining,
-      totalRework: acc.totalRework + item.reworkQty,
-      totalInventory: acc.totalInventory + item.finishedGoodsInventory,
-    }),
-    { totalPoQty: 0, totalStockIn: 0, totalRemaining: 0, totalRework: 0, totalInventory: 0 }
-  );
+  const summary = {
+    totalPoQty,
+    totalStockIn,
+    totalRemaining,
+    totalRework,
+    totalInventory
+  };
 
   return { invoices, items, summary };
 }

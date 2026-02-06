@@ -13,7 +13,8 @@ const Dashboard: React.FC<DashboardProps> = ({ data, insights, isGeneratingInsig
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredItems = useMemo(() => {
-    const term = searchTerm.toLowerCase();
+    const term = searchTerm.toLowerCase().trim();
+    if (!term) return data.items;
     
     // Find indices of invoices that match the search term (e.g., "INV-250001")
     const matchingInvoiceIndices = data.invoices
@@ -54,7 +55,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data, insights, isGeneratingInsig
       .slice(0, 5);
   }, [data.items]);
 
-  const productionRatio = (data.summary.totalStockIn / data.summary.totalPoQty) * 100;
+  const productionRatio = (data.summary.totalStockIn / data.summary.totalPoQty) * 100 || 0;
 
   return (
     <div className="max-w-[1600px] mx-auto p-4 md:p-8 space-y-8">
@@ -62,7 +63,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data, insights, isGeneratingInsig
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black tracking-tight">
-            <span className="text-slate-900">PPIC</span> <span className="text-blue-600">BEST BASE</span>
+            <span className="text-black">PPIC</span> <span className="text-blue-600">BEST BASE</span>
           </h1>
           <p className="text-slate-500 font-medium">Production & Inventory Real-time Intelligence</p>
         </div>
@@ -180,8 +181,9 @@ const Dashboard: React.FC<DashboardProps> = ({ data, insights, isGeneratingInsig
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {filteredItems.slice(0, 50).map((item, idx) => {
-                    const isCompleted = item.stockIn >= item.poQty;
-                    const percent = Math.min((item.stockIn / item.poQty) * 100, 100);
+                    // Logic: If Stock In is less than PO Qty, it is NOT COMPLETED
+                    const isCompleted = item.stockIn >= item.poQty && item.poQty > 0;
+                    const percent = item.poQty > 0 ? Math.min((item.stockIn / item.poQty) * 100, 100) : 0;
 
                     return (
                       <tr key={idx} className="hover:bg-slate-50/80 transition-colors group">
@@ -198,17 +200,17 @@ const Dashboard: React.FC<DashboardProps> = ({ data, insights, isGeneratingInsig
                         </td>
                         <td className="px-6 py-4 text-center">
                           <div className="flex items-center justify-center gap-3">
-                            <div className="px-2 py-1 bg-slate-50 rounded border border-slate-100">
+                            <div className="px-2 py-1 bg-slate-50 rounded border border-slate-100 min-w-[50px]">
                               <div className="text-[9px] text-slate-400 uppercase font-black">PO</div>
-                              <div className="font-bold text-slate-800">{item.poQty}</div>
+                              <div className="font-bold text-slate-800">{item.poQty.toLocaleString()}</div>
                             </div>
-                            <div className={`px-2 py-1 rounded border ${isCompleted ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-amber-50 border-amber-100 text-amber-700'}`}>
+                            <div className={`px-2 py-1 rounded border min-w-[50px] ${isCompleted ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-amber-50 border-amber-100 text-amber-700'}`}>
                               <div className="text-[9px] uppercase font-black opacity-60">In</div>
-                              <div className="font-bold">{item.stockIn}</div>
+                              <div className="font-bold">{item.stockIn.toLocaleString()}</div>
                             </div>
-                            <div className="px-2 py-1 bg-blue-50 border border-blue-100 text-blue-700 rounded">
+                            <div className="px-2 py-1 bg-blue-50 border border-blue-100 text-blue-700 rounded min-w-[50px]">
                               <div className="text-[9px] uppercase font-black opacity-60">Inv</div>
-                              <div className="font-bold">{item.finishedGoodsInventory}</div>
+                              <div className="font-bold">{item.finishedGoodsInventory.toLocaleString()}</div>
                             </div>
                           </div>
                         </td>
@@ -216,7 +218,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data, insights, isGeneratingInsig
                           {item.reworkQty > 0 ? (
                             <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-rose-50 text-rose-600 font-black text-[11px] border border-rose-100">
                               <i className="fas fa-tools text-[9px]"></i>
-                              {item.reworkQty}
+                              {item.reworkQty.toLocaleString()}
                             </div>
                           ) : (
                             <span className="text-slate-300">-</span>
@@ -282,7 +284,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data, insights, isGeneratingInsig
             <h3 className="text-slate-500 font-bold uppercase text-xs tracking-widest mb-6">Top Customers Volume</h3>
             <div className="space-y-4">
               {topCustomers.map(([name, val], idx) => {
-                const percentage = (val / topCustomers[0][1]) * 100;
+                const percentage = topCustomers[0][1] > 0 ? (val / topCustomers[0][1]) * 100 : 0;
                 return (
                   <div key={name} className="space-y-1">
                     <div className="flex justify-between text-xs font-bold text-slate-600">
@@ -292,7 +294,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data, insights, isGeneratingInsig
                     <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
                       <div 
                         className={`h-full rounded-full transition-all duration-1000`} 
-                        style={{ width: `${percentage}%`, backgroundColor: ['#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe'][idx] }}
+                        style={{ width: `${percentage}%`, backgroundColor: ['#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe'][idx % 5] }}
                       ></div>
                     </div>
                   </div>
