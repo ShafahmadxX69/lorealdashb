@@ -1,0 +1,5 @@
+{
+  "name": "Best Base Production Dashboard",
+  "description": "A comprehensive production command dashboard for tracking POs, inventory, shipments, and rework with AI-driven insights.",
+  "requestFramePermissions": []
+}
