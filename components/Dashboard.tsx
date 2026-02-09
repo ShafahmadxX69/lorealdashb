@@ -7,16 +7,125 @@ interface DashboardProps {
   insights: string;
   isGeneratingInsights: boolean;
   onGenerateInsights: () => void;
+  onRefresh: () => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ data, insights, isGeneratingInsights, onGenerateInsights }) => {
+type Language = 'en' | 'zh' | 'id';
+
+const translations = {
+  en: {
+    ppic: 'PPIC',
+    bestBase: 'BEST BASE',
+    subtitle: 'Production & Inventory Real-time Intelligence',
+    live: 'Live Sync Active',
+    aiInsights: 'AI Insights',
+    analyzing: 'Analyzing...',
+    totalPo: 'Total PO Qty',
+    totalIn: 'Total Stock In',
+    remaining: 'Remaining',
+    rework: 'Rework Qty',
+    inventory: 'Inventory',
+    productionCompletion: 'Production Completion',
+    achieved: 'Achieved',
+    highReworkAlerts: 'High Rework Alerts',
+    actionRequired: 'Action Required',
+    noRework: 'No significant rework detected',
+    registry: 'Line Items Registry',
+    search: 'Search PO, WO, Part, INV-, or Customer...',
+    powo: 'PO / WO',
+    customerItem: 'Customer / Item',
+    partNo: 'Part No',
+    quantities: 'Quantities (PO | In | Inv)',
+    status: 'Status',
+    completed: 'COMPLETED',
+    notCompleted: 'NOT COMPLETED',
+    aiSummary: 'AI Executive Summary',
+    clickInsights: 'Click "AI Insights" to analyze current production trends.',
+    topCustomers: 'Top Customers Volume',
+    upcomingExports: 'Upcoming Exports',
+    units: 'units',
+    refresh: 'Refresh',
+    language: 'Language'
+  },
+  zh: {
+    ppic: '生产计划',
+    bestBase: 'BEST BASE',
+    subtitle: '生产与库存实时智能系统',
+    live: '实时同步激活',
+    aiInsights: 'AI 见解',
+    analyzing: '分析中...',
+    totalPo: '总采购量',
+    totalIn: '总进货量',
+    remaining: '剩余量',
+    rework: '返工数量',
+    inventory: '库存',
+    productionCompletion: '生产完成率',
+    achieved: '已达成',
+    highReworkAlerts: '高返工警报',
+    actionRequired: '需要采取行动',
+    noRework: '未检测到重大返工',
+    registry: '行项目注册表',
+    search: '搜索 PO、WO、零件、INV- 或客户...',
+    powo: '采购单 / 工单',
+    customerItem: '客户 / 项目',
+    partNo: '零件编号',
+    quantities: '数量 (PO | 进货 | 库存)',
+    status: '状态',
+    completed: '已完成',
+    notCompleted: '未完成',
+    aiSummary: 'AI 执行摘要',
+    clickInsights: '点击“AI 见解”分析当前生产趋势。',
+    topCustomers: '主要客户成交量',
+    upcomingExports: '即将出口',
+    units: '个',
+    refresh: '刷新',
+    language: '语言'
+  },
+  id: {
+    ppic: 'PPIC',
+    bestBase: 'BEST BASE',
+    subtitle: 'Intelijen Real-time Produksi & Inventaris',
+    live: 'Sinkronisasi Aktif',
+    aiInsights: 'Wawasan AI',
+    analyzing: 'Menganalisis...',
+    totalPo: 'Total Qty PO',
+    totalIn: 'Total Stock In',
+    remaining: 'Sisa',
+    rework: 'Qty Rework',
+    inventory: 'Inventaris',
+    productionCompletion: 'Penyelesaian Produksi',
+    achieved: 'Tercapai',
+    highReworkAlerts: 'Peringatan Rework Tinggi',
+    actionRequired: 'Tindakan Diperlukan',
+    noRework: 'Tidak ada rework signifikan terdeteksi',
+    registry: 'Daftar Item Produksi',
+    search: 'Cari PO, WO, Part, INV-, atau Pelanggan...',
+    powo: 'PO / WO',
+    customerItem: 'Pelanggan / Item',
+    partNo: 'No Part',
+    quantities: 'Kuantitas (PO | In | Inv)',
+    status: 'Status',
+    completed: 'SELESAI',
+    notCompleted: 'BELUM SELESAI',
+    aiSummary: 'Ringkasan Eksekutif AI',
+    clickInsights: 'Klik "Wawasan AI" untuk menganalisis tren produksi.',
+    topCustomers: 'Volume Pelanggan Teratas',
+    upcomingExports: 'Ekspor Mendatang',
+    units: 'unit',
+    refresh: 'Segarkan',
+    language: 'Bahasa'
+  }
+};
+
+const Dashboard: React.FC<DashboardProps> = ({ data, insights, isGeneratingInsights, onGenerateInsights, onRefresh }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [lang, setLang] = useState<Language>('en');
+  const t = translations[lang];
 
   const filteredItems = useMemo(() => {
     const term = searchTerm.toLowerCase().trim();
     if (!term) return data.items;
     
-    // Find indices of invoices that match the search term (e.g., "INV-250001")
     const matchingInvoiceIndices = data.invoices
       .map((inv, idx) => (
         inv.invoiceTitle.toLowerCase().includes(term) || 
@@ -30,10 +139,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data, insights, isGeneratingInsig
         item.woNo.toLowerCase().includes(term) ||
         item.partNo.toLowerCase().includes(term) ||
         item.customer.toLowerCase().includes(term);
-      
-      // Check if this item has any quantity allocated to a matching invoice
       const matchesInvoice = matchingInvoiceIndices.some(idx => (item.invoiceQtys[idx] || 0) > 0);
-      
       return matchesBasic || matchesInvoice;
     });
   }, [data.items, data.invoices, searchTerm]);
@@ -61,35 +167,65 @@ const Dashboard: React.FC<DashboardProps> = ({ data, insights, isGeneratingInsig
     <div className="max-w-[1600px] mx-auto p-4 md:p-8 space-y-8">
       {/* Header */}
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-black tracking-tight">
-            <span className="text-black">PPIC</span> <span className="text-blue-600">BEST BASE</span>
-          </h1>
-          <p className="text-slate-500 font-medium">Production & Inventory Real-time Intelligence</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-200 flex items-center gap-2">
-            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-            <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">Live Sync Active</span>
+        <div className="flex items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-black tracking-tight">
+              <span className="text-black">{t.ppic}</span> <span className="text-blue-600">{t.bestBase}</span>
+            </h1>
+            <p className="text-slate-500 font-medium">{t.subtitle}</p>
           </div>
+          <button 
+            onClick={onRefresh}
+            title={t.refresh}
+            className="p-3 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-blue-600 hover:border-blue-200 transition-all shadow-sm active:scale-95"
+          >
+            <i className="fas fa-sync-alt"></i>
+          </button>
+        </div>
+        
+        <div className="flex items-center flex-wrap gap-3">
+          <div className="relative group">
+            <button className="bg-white px-4 py-2.5 rounded-xl shadow-sm border border-slate-200 flex items-center gap-2 text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors">
+              <i className="fas fa-globe text-blue-500"></i>
+              <span>{lang.toUpperCase()}</span>
+              <i className="fas fa-chevron-down text-[10px] opacity-40"></i>
+            </button>
+            <div className="absolute top-full right-0 mt-2 w-32 bg-white rounded-xl shadow-xl border border-slate-100 hidden group-hover:block z-50 overflow-hidden">
+              {(['en', 'zh', 'id'] as Language[]).map(l => (
+                <button 
+                  key={l}
+                  onClick={() => setLang(l)}
+                  className={`w-full text-left px-4 py-3 text-sm font-bold hover:bg-blue-50 transition-colors ${lang === l ? 'text-blue-600 bg-blue-50/50' : 'text-slate-600'}`}
+                >
+                  {l === 'en' ? 'English' : l === 'zh' ? 'Mandarin' : 'Bahasa'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-white px-4 py-2.5 rounded-xl shadow-sm border border-slate-200 flex items-center gap-2 hidden sm:flex">
+            <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+            <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">{t.live}</span>
+          </div>
+
           <button 
             onClick={onGenerateInsights}
             disabled={isGeneratingInsights}
             className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 transition-all shadow-lg shadow-indigo-200 active:scale-95"
           >
             {isGeneratingInsights ? <i className="fas fa-circle-notch animate-spin"></i> : <i className="fas fa-robot"></i>}
-            {isGeneratingInsights ? 'Analyzing...' : 'AI Insights'}
+            {isGeneratingInsights ? t.analyzing : t.aiInsights}
           </button>
         </div>
       </header>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <StatCard title="Total PO Qty" value={data.summary.totalPoQty} icon="fa-shopping-cart" color="indigo" />
-        <StatCard title="Total Stock In" value={data.summary.totalStockIn} icon="fa-box-open" color="emerald" />
-        <StatCard title="Remaining" value={data.summary.totalRemaining} icon="fa-clock" color="amber" />
-        <StatCard title="Rework Qty" value={data.summary.totalRework} icon="fa-tools" color="rose" />
-        <StatCard title="Inventory" value={data.summary.totalInventory} icon="fa-warehouse" color="blue" />
+        <StatCard title={t.totalPo} value={data.summary.totalPoQty} icon="fa-shopping-cart" color="indigo" />
+        <StatCard title={t.totalIn} value={data.summary.totalStockIn} icon="fa-box-open" color="emerald" />
+        <StatCard title={t.remaining} value={data.summary.totalRemaining} icon="fa-clock" color="amber" />
+        <StatCard title={t.rework} value={data.summary.totalRework} icon="fa-tools" color="rose" />
+        <StatCard title={t.inventory} value={data.summary.totalInventory} icon="fa-warehouse" color="blue" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -99,7 +235,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data, insights, isGeneratingInsig
               <div className="absolute top-0 right-0 p-4 opacity-10">
                 <i className="fas fa-chart-pie text-6xl text-indigo-600"></i>
               </div>
-              <h3 className="text-slate-500 font-bold uppercase text-xs tracking-widest mb-6 self-start">Production Completion</h3>
+              <h3 className="text-slate-500 font-bold uppercase text-xs tracking-widest mb-6 self-start">{t.productionCompletion}</h3>
               <div className="relative w-48 h-48 flex items-center justify-center">
                 <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
                   <circle cx="50" cy="50" r="45" fill="none" stroke="#f1f5f9" strokeWidth="8" />
@@ -113,18 +249,18 @@ const Dashboard: React.FC<DashboardProps> = ({ data, insights, isGeneratingInsig
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
                   <span className="text-4xl font-black text-slate-900">{Math.round(productionRatio)}%</span>
-                  <span className="text-[10px] uppercase font-bold text-slate-400">Achieved</span>
+                  <span className="text-[10px] uppercase font-bold text-slate-400">{t.achieved}</span>
                 </div>
               </div>
               <p className="mt-6 text-sm text-slate-500 text-center font-medium">
-                {data.summary.totalStockIn.toLocaleString()} / {data.summary.totalPoQty.toLocaleString()} units
+                {data.summary.totalStockIn.toLocaleString()} / {data.summary.totalPoQty.toLocaleString()} {t.units}
               </p>
             </div>
 
             <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
               <div className="flex justify-between items-start mb-6">
-                <h3 className="text-slate-500 font-bold uppercase text-xs tracking-widest">High Rework Alerts</h3>
-                <span className="bg-rose-100 text-rose-700 px-2 py-0.5 rounded text-[10px] font-bold">Action Required</span>
+                <h3 className="text-slate-500 font-bold uppercase text-xs tracking-widest">{t.highReworkAlerts}</h3>
+                <span className="bg-rose-100 text-rose-700 px-2 py-0.5 rounded text-[10px] font-bold">{t.actionRequired}</span>
               </div>
               <div className="space-y-4">
                 {topReworkItems.length > 0 ? topReworkItems.map((item, idx) => (
@@ -135,8 +271,8 @@ const Dashboard: React.FC<DashboardProps> = ({ data, insights, isGeneratingInsig
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="text-right">
-                        <div className="text-[10px] font-bold text-rose-500">{item.reworkQty} units</div>
-                        <div className="text-[9px] text-slate-400">Rework</div>
+                        <div className="text-[10px] font-bold text-rose-500">{item.reworkQty.toLocaleString()} {t.units}</div>
+                        <div className="text-[9px] text-slate-400">{t.rework}</div>
                       </div>
                       <div className="w-1.5 h-8 bg-rose-50 rounded-full overflow-hidden">
                         <div 
@@ -147,7 +283,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data, insights, isGeneratingInsig
                     </div>
                   </div>
                 )) : (
-                  <div className="text-center py-8 text-slate-400 italic text-sm">No significant rework detected</div>
+                  <div className="text-center py-8 text-slate-400 italic text-sm">{t.noRework}</div>
                 )}
               </div>
             </div>
@@ -155,12 +291,12 @@ const Dashboard: React.FC<DashboardProps> = ({ data, insights, isGeneratingInsig
 
           <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
             <div className="p-6 border-b border-slate-50 flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <h3 className="text-slate-800 font-bold">Line Items Registry</h3>
+              <h3 className="text-slate-800 font-bold">{t.registry}</h3>
               <div className="relative">
                 <i className="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
                 <input 
                   type="text" 
-                  placeholder="Search PO, WO, Part, INV-, or Customer..."
+                  placeholder={t.search}
                   className="bg-slate-50 border-none rounded-xl pl-11 pr-4 py-2.5 text-sm w-full md:w-80 focus:ring-2 focus:ring-blue-500 transition-all"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -171,17 +307,16 @@ const Dashboard: React.FC<DashboardProps> = ({ data, insights, isGeneratingInsig
               <table className="w-full text-left text-sm whitespace-nowrap">
                 <thead className="bg-slate-50/50 text-slate-500 font-bold text-xs uppercase tracking-wider">
                   <tr>
-                    <th className="px-6 py-4">PO / WO</th>
-                    <th className="px-6 py-4">Customer / Item</th>
-                    <th className="px-6 py-4">Part No</th>
-                    <th className="px-6 py-4 text-center">Quantities (PO | In | Inv)</th>
-                    <th className="px-6 py-4 text-center">Rework</th>
-                    <th className="px-6 py-4 text-center">Status</th>
+                    <th className="px-6 py-4">{t.powo}</th>
+                    <th className="px-6 py-4">{t.customerItem}</th>
+                    <th className="px-6 py-4">{t.partNo}</th>
+                    <th className="px-6 py-4 text-center">{t.quantities}</th>
+                    <th className="px-6 py-4 text-center">{t.rework}</th>
+                    <th className="px-6 py-4 text-center">{t.status}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
                   {filteredItems.slice(0, 50).map((item, idx) => {
-                    // Logic: If Stock In is less than PO Qty, it is NOT COMPLETED
                     const isCompleted = item.stockIn >= item.poQty && item.poQty > 0;
                     const percent = item.poQty > 0 ? Math.min((item.stockIn / item.poQty) * 100, 100) : 0;
 
@@ -216,9 +351,9 @@ const Dashboard: React.FC<DashboardProps> = ({ data, insights, isGeneratingInsig
                         </td>
                         <td className="px-6 py-4 text-center">
                           {item.reworkQty > 0 ? (
-                            <div className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md bg-rose-50 text-rose-600 font-black text-[11px] border border-rose-100">
-                              <i className="fas fa-tools text-[9px]"></i>
-                              {item.reworkQty.toLocaleString()}
+                            <div className="inline-flex flex-col items-center">
+                              <span className="text-rose-600 font-black text-sm">{item.reworkQty.toLocaleString()}</span>
+                              <span className="text-[9px] text-rose-400 font-bold uppercase">{t.rework}</span>
                             </div>
                           ) : (
                             <span className="text-slate-300">-</span>
@@ -228,7 +363,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data, insights, isGeneratingInsig
                           <div className="flex flex-col gap-1.5">
                             <div className="flex justify-between items-center px-1">
                               <span className={`text-[10px] font-black uppercase tracking-wider ${isCompleted ? 'text-emerald-600' : 'text-amber-600'}`}>
-                                {isCompleted ? 'COMPLETED' : 'NOT COMPLETED'}
+                                {isCompleted ? t.completed : t.notCompleted}
                               </span>
                               <span className="text-[10px] font-bold text-slate-400">{Math.round(percent)}%</span>
                             </div>
@@ -261,7 +396,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data, insights, isGeneratingInsig
               <i className="fas fa-brain text-8xl"></i>
             </div>
             <h3 className="text-slate-400 font-bold uppercase text-xs tracking-widest mb-4 flex items-center gap-2">
-              <i className="fas fa-sparkles text-blue-400"></i> AI Executive Summary
+              <i className="fas fa-sparkles text-blue-400"></i> {t.aiSummary}
             </h3>
             {insights ? (
               <div className="text-sm leading-relaxed space-y-3 prose prose-invert max-w-none">
@@ -275,13 +410,13 @@ const Dashboard: React.FC<DashboardProps> = ({ data, insights, isGeneratingInsig
             ) : (
               <div className="py-8 text-center text-slate-500">
                 <i className="fas fa-chart-line text-4xl mb-4 opacity-50 block"></i>
-                <p className="text-sm">Click "AI Insights" to analyze current production trends and rework patterns.</p>
+                <p className="text-sm">{t.clickInsights}</p>
               </div>
             )}
           </div>
 
           <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-            <h3 className="text-slate-500 font-bold uppercase text-xs tracking-widest mb-6">Top Customers Volume</h3>
+            <h3 className="text-slate-500 font-bold uppercase text-xs tracking-widest mb-6">{t.topCustomers}</h3>
             <div className="space-y-4">
               {topCustomers.map(([name, val], idx) => {
                 const percentage = topCustomers[0][1] > 0 ? (val / topCustomers[0][1]) * 100 : 0;
@@ -304,7 +439,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data, insights, isGeneratingInsig
           </div>
 
           <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-            <h3 className="text-slate-500 font-bold uppercase text-xs tracking-widest mb-6">Upcoming Exports</h3>
+            <h3 className="text-slate-500 font-bold uppercase text-xs tracking-widest mb-6">{t.upcomingExports}</h3>
             <div className="space-y-4">
               {data.invoices.slice(0, 10).map((inv, idx) => (
                 <div 
@@ -322,7 +457,7 @@ const Dashboard: React.FC<DashboardProps> = ({ data, insights, isGeneratingInsig
                     <div className="text-xs text-slate-500 truncate max-w-[200px]">{inv.brand}</div>
                     <div className="mt-2 flex items-center gap-3">
                        <span className="text-[10px] bg-blue-50 text-blue-600 px-2 py-0.5 rounded border border-blue-100 font-bold">
-                         {inv.totalQty.toLocaleString()} units
+                         {inv.totalQty.toLocaleString()} {t.units}
                        </span>
                     </div>
                   </div>
